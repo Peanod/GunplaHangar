@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import './Profile.css';
 import * as kitHooks from '../hooks/useKits';
 
@@ -8,7 +9,7 @@ const useKits = kitHooks.useKits ?? kitHooks.default;
 const PROFILE = {
   name: 'Finodi',
   nim: '21120124140138',
-  campus: 'Teknik Komputer UNDIP · PPB 2026',
+  campus: 'Teknik Komputer UNDIP · Praktikum PPB 2026',
   repo: 'https://github.com/Peanod/GunplaHangar',
   demo: 'https://gunpla-hangar-tau.vercel.app',
 };
@@ -52,8 +53,42 @@ function useStats() {
   };
 }
 
+
+// Install PWA: pakai prompt bawaan browser kalau tersedia
+function useInstall() {
+  const [evt, setEvt] = useState(null);
+  const [installed, setInstalled] = useState(
+    typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches
+  );
+  const [hint, setHint] = useState('');
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setEvt(e); };
+    const onInstalled = () => { setInstalled(true); setEvt(null); };
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const install = async () => {
+    if (evt) {
+      evt.prompt();
+      await evt.userChoice;
+      setEvt(null);
+    } else {
+      setHint('Buka menu browser lalu pilih "Install app" atau "Add to Home Screen".');
+    }
+  };
+
+  return { install, installed, hint };
+}
+
 export default function Profile() {
   const s = useStats();
+  const { install, installed, hint } = useInstall();
   const stats = [
     { n: s.total, label: 'Total', c: 'var(--cyan)' },
     { n: s.backlog, label: 'Backlog', c: 'var(--slate)' },
@@ -132,8 +167,11 @@ export default function Profile() {
       <section className="section">
         <h3>Tautan</h3>
         <div className="links">
-          <a className="btn primary" href={PROFILE.demo} target="_blank" rel="noreferrer">Buka aplikasi</a>
-          <a className="btn" href={PROFILE.repo} target="_blank" rel="noreferrer">Repository GitHub</a>
+          {!installed && (
+            <button type="button" className="profile-btn" onClick={install}>Install aplikasi</button>
+          )}
+          <a className="profile-btn" href={PROFILE.repo} target="_blank" rel="noreferrer">Repository GitHub</a>
+          {hint && <p className="install-hint">{hint}</p>}
         </div>
       </section>
     </main>
