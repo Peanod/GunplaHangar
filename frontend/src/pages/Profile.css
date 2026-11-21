@@ -1,0 +1,145 @@
+/* Profile — mengikuti tema app (font diwarisi dari global, aksen cyan + oranye) */
+.profile {
+  --card: #101c3a;
+  --card-2: #0c1530;
+  --line: #1f2d54;
+  --title: #ffffff;
+  --muted: #8d9bd0;
+  --label: #8fa3d9;
+  --cyan: #22d3ee;
+  --orange: #ffab2e;
+  --green: #3ddc97;
+  --slate: #9aa8d6;
+
+  /* KUNCI pemusatan di PC: lebar dibatasi + margin auto kiri-kanan */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+  align-self: center;     /* kalau parent flex kolom */
+  justify-self: center;   /* kalau parent grid */
+  padding: 20px 16px 112px;
+  color: var(--title);
+  font-family: inherit;
+}
+.profile *, .profile *::before, .profile *::after { box-sizing: border-box; }
+
+.page-title { margin: 0 0 14px; font-size: 26px; font-weight: 700; }
+
+/* ---------- KARTU IDENTITAS ---------- */
+.id-card {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.avatar {
+  flex: none;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 26px; font-weight: 700;
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  background: rgba(34, 211, 238, .08);
+}
+.id-card h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.id-card p  { margin: 3px 0 0; font-size: 14px; color: var(--muted); }
+.id-meta { margin-left: auto; display: none; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.chip {
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card-2);
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+
+/* ---------- STATISTIK ---------- */
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stat {
+  padding: 16px 10px;
+  text-align: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  border-bottom: 3px solid var(--c);
+}
+.stat b { display: block; font-size: 34px; line-height: 1; font-weight: 700; color: var(--c); }
+.stat span { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+/* ---------- SECTION ---------- */
+.section { margin-top: 24px; }
+.section > h3 {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 10px;
+  font-size: 15px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--label);
+}
+.section > h3::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.lead { margin: 0 0 4px; max-width: 70ch; font-size: 15px; line-height: 1.7; color: #dfe6ff; }
+
+.list { display: grid; gap: 10px; grid-template-columns: 1fr; }
+
+.card {
+  position: relative;
+  padding: 15px 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: border-color .15s;
+}
+.card:hover { border-color: var(--c, var(--cyan)); }
+.card h4 { margin: 0 0 3px; font-size: 16px; font-weight: 700; }
+.card p  { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.card.has-tag { padding-right: 84px; }
+
+.tag {
+  position: absolute; top: 14px; right: 14px;
+  padding: 2px 9px; border-radius: 6px;
+  font-size: 11px; font-weight: 700; color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+
+.card-row { display: flex; gap: 14px; align-items: flex-start; }
+.ico {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  display: grid; place-items: center; color: var(--c);
+  background: color-mix(in srgb, var(--c) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+}
+.ico svg { width: 20px; height: 20px; }
+
+/* ---------- TAUTAN ---------- */
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  padding: 11px 18px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--title); font-size: 14px; font-weight: 700; text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+.btn:hover { border-color: var(--cyan); }
+.btn.primary { background: var(--cyan); border-color: var(--cyan); color: #06222a; }
+.btn.primary:hover { background: #5fe3f5; }
+.btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) { .card, .btn { transition: none; } }
+
+/* ---------- LAYAR LEBAR (PC) ---------- */
+@media (min-width: 640px) {
+  .stats { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .profile { padding-top: 32px; }
+  .page-title { font-size: 30px; }
+  .id-meta { display: flex; }
+
+  /* dua kolom: fitur di kiri, teknologi di kanan */
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 28px;
+    align-items: start;
+  }
+  .stat b { font-size: 40px; }
+}
