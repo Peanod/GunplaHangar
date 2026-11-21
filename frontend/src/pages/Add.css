@@ -1,0 +1,74 @@
+/* Halaman Tambah data — semua selector di bawah .add-page
+   supaya menang atas styles.css dan tidak mengubah halaman lain. */
+
+.add-page {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;           /* pusatkan di PC */
+}
+
+.add-page .pills { margin-bottom: 16px; }
+
+/* Formulir sebagai panel */
+.add-page .add-form {
+  max-width: none;               /* lawan `.page form { max-width: 560px }` */
+  gap: 16px;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.add-page .add-form input,
+.add-page .add-form select,
+.add-page .add-form textarea { background: var(--bg); }
+
+.add-page .add-form textarea { resize: vertical; min-height: 110px; }
+
+.add-page .two { display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+/* Blok unggah foto */
+.add-page .field { display: grid; gap: 6px; color: var(--muted); font-size: .85rem; }
+
+.add-page .drop {
+  position: relative;
+  display: grid; justify-items: center; gap: 4px;
+  padding: 20px 14px;
+  text-align: center;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.add-page .drop:hover,
+.add-page .drop:focus-within { border-color: var(--cyan); }
+
+.add-page .drop input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  padding: 0; border: 0; opacity: 0; cursor: pointer;
+}
+.add-page .drop b { color: var(--cyan); font-size: .95rem; }
+.add-page .drop em { font-style: normal; font-size: .8rem; color: var(--muted); word-break: break-all; }
+
+.add-page .linklike { justify-self: start; }
+
+.add-page .preview {
+  width: 100%; max-width: 260px;
+  aspect-ratio: 4 / 3; object-fit: cover;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel2);
+}
+
+@media (min-width: 640px) {
+  .add-page .two { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 900px) {
+  .add-page .add-form { padding: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .add-page .drop { transition: none; }
+}
