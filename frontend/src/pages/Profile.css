@@ -110,19 +110,23 @@
 .ico svg { width: 20px; height: 20px; }
 
 /* ---------- TAUTAN ---------- */
-.links { display: flex; flex-wrap: wrap; gap: 10px; }
-.btn {
+.profile .links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+.profile .profile-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: auto; flex: none;               /* jangan melebar penuh */
   padding: 11px 18px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--card);
-  color: var(--title); font-size: 14px; font-weight: 700; text-decoration: none;
-  transition: border-color .15s, background .15s;
+  color: var(--title); font: inherit; font-size: 14px; font-weight: 700;
+  text-decoration: none; cursor: pointer;
+  transition: border-color .15s;
 }
-.btn:hover { border-color: var(--cyan); }
-.btn.primary { background: var(--cyan); border-color: var(--cyan); color: #06222a; }
-.btn.primary:hover { background: #5fe3f5; }
-.btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.profile .profile-btn:hover { border-color: var(--cyan); }
+.profile .profile-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
-@media (prefers-reduced-motion: reduce) { .card, .btn { transition: none; } }
+.profile .install-hint { flex-basis: 100%; margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .card, .profile-btn { transition: none; } }
 
 /* ---------- LAYAR LEBAR (PC) ---------- */
 @media (min-width: 640px) {
