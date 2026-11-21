@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import kitService from '../services/kitService.js';
 import logService from '../services/logService.js';
@@ -6,7 +6,9 @@ import uploadService from '../services/uploadService.js';
 import { kitTitle } from '../util.js';
 import { useGrades } from '../hooks/useGrades.js';
 import { useKits } from '../hooks/useKits.js';
+import './Add.css';
 
+const MAX_MB = 4;
 const today = () => new Date().toISOString().slice(0, 10);
 
 function KitForm() {
@@ -14,9 +16,34 @@ function KitForm() {
   const { data: grades } = useGrades();
   const [f, setF] = useState({ name: '', grade_id: '', series: '', image_url: '' });
   const [file, setFile] = useState(null);
+  const [fileKey, setFileKey] = useState(0); // untuk mereset input file
+  const [localUrl, setLocalUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+  // pratinjau foto yang dipilih
+  useEffect(() => {
+    if (!file) { setLocalUrl(''); return undefined; }
+    const u = URL.createObjectURL(file);
+    setLocalUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  const preview = localUrl || f.image_url.trim();
+
+  const pickFile = (e) => {
+    const picked = e.target.files[0] || null;
+    if (picked && picked.size > MAX_MB * 1024 * 1024) {
+      setErr(`Ukuran foto maksimal ${MAX_MB} MB.`);
+      setFileKey((k) => k + 1);
+      return;
+    }
+    setErr('');
+    setFile(picked);
+  };
+
+  const clearFile = () => { setFile(null); setFileKey((k) => k + 1); };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -30,26 +57,48 @@ function KitForm() {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form className="add-form" onSubmit={submit}>
       <label>Nama Gunpla
         <input value={f.name} onChange={set('name')} placeholder="Contoh: Nu Gundam" required />
         <small>Tulis tanpa grade, grade ditambahkan otomatis di depan nama.</small>
       </label>
-      <label>Grade
-        <select value={f.grade_id} onChange={set('grade_id')} required>
-          <option value="">Pilih grade</option>
-          {grades?.map((g) => <option key={g.id} value={g.id}>{g.name}{g.scale ? ` (${g.scale})` : ''}</option>)}
-        </select>
-      </label>
-      <label>Seri anime
-        <input value={f.series} onChange={set('series')} placeholder="Contoh: Char's Counterattack" />
-      </label>
+
+      <div className="two">
+        <label>Grade
+          <select value={f.grade_id} onChange={set('grade_id')} required>
+            <option value="">Pilih grade</option>
+            {grades?.map((g) => <option key={g.id} value={g.id}>{g.name}{g.scale ? ` (${g.scale})` : ''}</option>)}
+          </select>
+        </label>
+        <label>Seri anime
+          <input value={f.series} onChange={set('series')} placeholder="Contoh: Char's Counterattack" />
+        </label>
+      </div>
+
       <label>URL gambar
         <input type="url" value={f.image_url} onChange={set('image_url')} placeholder="https://…jpg" disabled={!!file} />
       </label>
-      <label>Atau unggah foto (maks. 4 MB)
-        <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0] || null)} />
-      </label>
+
+      <div className="field">
+        <span>Atau unggah foto (maks. {MAX_MB} MB)</span>
+        <label className="drop">
+          <input key={fileKey} type="file" accept="image/*" onChange={pickFile} />
+          <b>{file ? 'Ganti foto' : 'Pilih foto dari perangkat'}</b>
+          <em>{file ? file.name : 'JPG, PNG, atau WEBP'}</em>
+        </label>
+        {file && <button type="button" className="linklike" onClick={clearFile}>Hapus foto terpilih</button>}
+      </div>
+
+      {preview && (
+        <img
+          className="preview"
+          src={preview}
+          alt="Pratinjau gambar kit"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          onLoad={(e) => { e.currentTarget.style.display = ''; }}
+        />
+      )}
+
       {err && <p className="msg error" role="alert">{err}</p>}
       <button className="primary" disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan ke hangar'}</button>
     </form>
@@ -74,7 +123,7 @@ function LogForm() {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form className="add-form" onSubmit={submit}>
       <label>Kit yang dikerjakan
         <select value={f.kit_id} onChange={set('kit_id')} required>
           <option value="">{kits?.length === 0 ? 'Belum ada kit, tambah kit dulu' : 'Pilih kit'}</option>
@@ -84,12 +133,16 @@ function LogForm() {
       <label>Judul catatan
         <input value={f.title} onChange={set('title')} placeholder="Contoh: Rakit inner frame kaki" required />
       </label>
-      <label>Teknik
-        <input value={f.technique} onChange={set('technique')} placeholder="Contoh: Metallic drybrush" />
-      </label>
-      <label>Tanggal kerja
-        <input type="date" value={f.work_date} onChange={set('work_date')} required />
-      </label>
+
+      <div className="two">
+        <label>Teknik
+          <input value={f.technique} onChange={set('technique')} placeholder="Contoh: Metallic drybrush" />
+        </label>
+        <label>Tanggal kerja
+          <input type="date" value={f.work_date} onChange={set('work_date')} required />
+        </label>
+      </div>
+
       <label>Catatan
         <textarea rows="5" value={f.notes} onChange={set('notes')} placeholder="Apa yang dikerjakan, cat atau tool yang dipakai, kendala…" />
       </label>
@@ -102,13 +155,13 @@ function LogForm() {
 export default function Add() {
   const [mode, setMode] = useState('kit');
   return (
-    <>
+    <div className="add-page">
       <header className="top"><h1>Tambah data</h1></header>
-      <div className="pills">
-        <button className={mode === 'kit' ? 'on' : ''} onClick={() => setMode('kit')}>Kit baru</button>
-        <button className={mode === 'log' ? 'on' : ''} onClick={() => setMode('log')}>Catatan baru</button>
+      <div className="pills" role="group" aria-label="Jenis data">
+        <button type="button" className={mode === 'kit' ? 'on' : ''} aria-pressed={mode === 'kit'} onClick={() => setMode('kit')}>Kit baru</button>
+        <button type="button" className={mode === 'log' ? 'on' : ''} aria-pressed={mode === 'log'} onClick={() => setMode('log')}>Catatan baru</button>
       </div>
       {mode === 'kit' ? <KitForm /> : <LogForm />}
-    </>
+    </div>
   );
 }
