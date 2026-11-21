@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './Profile.css';
+import { isInstalled, promptInstall, subscribe } from '../pwaInstall.js';
 import * as kitHooks from '../hooks/useKits';
 
 // useKits bisa diekspor named atau default; dua-duanya ditangani.
@@ -8,8 +9,8 @@ const useKits = kitHooks.useKits ?? kitHooks.default;
 // ====== DATA DIRI ======
 const PROFILE = {
   name: 'Finodi',
-  nim: '21120124140138',
-  campus: 'Teknik Komputer UNDIP · Praktikum PPB 2026',
+  nim: '2112012414013',
+  campus: 'Teknik Komputer UNDIP · PPB 2026',
   repo: 'https://github.com/Peanod/GunplaHangar',
   demo: 'https://gunpla-hangar-tau.vercel.app',
 };
@@ -54,36 +55,22 @@ function useStats() {
 }
 
 
-// Install PWA: pakai prompt bawaan browser kalau tersedia
+// Tombol Install memakai tawaran install browser yang ditangkap di pwaInstall.js
+const HINT = 'Buka menu browser lalu pilih "Install app" atau "Add to Home Screen".';
+
 function useInstall() {
-  const [evt, setEvt] = useState(null);
-  const [installed, setInstalled] = useState(
-    typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches
-  );
+  const [, refresh] = useState(0);
   const [hint, setHint] = useState('');
 
-  useEffect(() => {
-    const onPrompt = (e) => { e.preventDefault(); setEvt(e); };
-    const onInstalled = () => { setInstalled(true); setEvt(null); };
-    window.addEventListener('beforeinstallprompt', onPrompt);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
+  useEffect(() => subscribe(() => refresh((n) => n + 1)), []);
 
   const install = async () => {
-    if (evt) {
-      evt.prompt();
-      await evt.userChoice;
-      setEvt(null);
-    } else {
-      setHint('Buka menu browser lalu pilih "Install app" atau "Add to Home Screen".');
-    }
+    setHint('');
+    const result = await promptInstall();
+    if (result === 'unavailable' || result === 'error') setHint(HINT);
   };
 
-  return { install, installed, hint };
+  return { install, installed: isInstalled(), hint };
 }
 
 export default function Profile() {
@@ -97,7 +84,7 @@ export default function Profile() {
   ];
 
   return (
-    <main className="profile">
+    <main className="page profile">
       <h1 className="page-title">Profil</h1>
 
       <div className="id-card">
@@ -168,7 +155,7 @@ export default function Profile() {
         <h3>Tautan</h3>
         <div className="links">
           {!installed && (
-            <button type="button" className="profile-btn" onClick={install}>Install aplikasi</button>
+            <button type="button" className="profile-btn solid" onClick={install}>Install</button>
           )}
           <a className="profile-btn" href={PROFILE.repo} target="_blank" rel="noreferrer">Repository GitHub</a>
           {hint && <p className="install-hint">{hint}</p>}
