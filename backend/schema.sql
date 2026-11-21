@@ -37,7 +37,7 @@ create table if not exists build_logs (
 );
 
 insert into grades (name, scale) values
-  ('HG', '1/144'), ('RG', '1/144'), ('MG', '1/100'), ('PG', '1/60'), ('SD', null)
+  ('EG', '1/144'), ('HG', '1/144'), ('RG', '1/144'), ('MG', '1/100'), ('PG', '1/60'), ('SD', null)
 on conflict (name) do nothing;
 
 -- Tabel dibuat tanpa RLS (sama seperti Modul 1) agar bisa diakses dengan anon key
