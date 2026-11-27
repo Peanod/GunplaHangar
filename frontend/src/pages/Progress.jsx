@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useKits } from '../hooks/useKits.js';
+import { useOutbox } from '../outbox.js';
+import QueueCard from '../components/QueueCard.jsx';
 import { Badge, KitImg, Segments, State } from '../components/Bits.jsx';
 import { cardImage, derive, kitTitle } from '../util.js';
 
@@ -10,8 +12,16 @@ const FILTERS = [
 const CLS = (s) => (s === 'Completed' ? 'done' : s === 'On Progress' ? 'wip' : 'backlog');
 
 export default function Progress() {
-  const { data: kits, loading, error } = useKits();
+  const { data: kits, loading, error, refetch } = useKits();
+  const { items, tick, syncNow, retry, discard } = useOutbox();
   const [filter, setFilter] = useState('all');
+
+  // Setiap ada kit antrean yang berhasil terkirim, muat ulang daftar dari server
+  useEffect(() => { if (tick > 0) refetch(); }, [tick, refetch]);
+
+  const queued = items.filter((q) => q.type === 'kit');
+  // Kit baru selalu berstatus Backlog, jadi antrean tampil di filter Semua dan Backlog
+  const showQueue = queued.length > 0 && (filter === 'all' || filter === 'Backlog');
   const shown = (kits || []).filter((k) => filter === 'all' || k.status === filter);
 
   return (
@@ -22,33 +32,51 @@ export default function Progress() {
           <button key={v} className={filter === v ? 'on' : ''} onClick={() => setFilter(v)}>{l}</button>
         ))}
       </div>
+
+      {showQueue && (
+        <section aria-labelledby="antrean">
+          <div className="qhead">
+            <h2 id="antrean">Menunggu dikirim ({queued.length})</h2>
+            {queued.some((q) => q.status === 'pending') && (
+              <button type="button" className="linklike" onClick={syncNow}>Kirim sekarang</button>
+            )}
+          </div>
+          <ul className="list">
+            {queued.map((q) => <QueueCard key={q.id} item={q} onRetry={retry} onDiscard={discard} />)}
+          </ul>
+        </section>
+      )}
+
       <State loading={loading} error={error}>
         {kits?.length === 0 ? (
-          <p className="state">Belum ada kit. <Link to="/tambah">Tambah kit pertamamu</Link>.</p>
+          queued.length === 0 && <p className="state">Belum ada kit. <Link to="/tambah">Tambah kit pertamamu</Link>.</p>
         ) : shown.length === 0 ? (
           <p className="state">Tidak ada kit dengan status ini.</p>
         ) : (
-          <ul className="list">
-            {shown.map((k) => {
-              const { done } = derive(k);
-              return (
-                <li key={k.id}>
-                  <Link to={`/kit/${k.id}`} className={`card kit ${CLS(k.status)}`}>
-                    <KitImg src={cardImage(k)} alt="" className="thumb" />
-                    <div className="grow">
-                      <strong>{kitTitle(k)}</strong>
-                      <small>{[k.series, k.grades?.scale].filter(Boolean).join(' • ')}</small>
-                      <div className="row">
-                        <Segments done={done} status={k.status} />
-                        <span className="pct">{k.progress}%</span>
+          <>
+            {showQueue && <h2>Di hangar</h2>}
+            <ul className="list">
+              {shown.map((k) => {
+                const { done } = derive(k);
+                return (
+                  <li key={k.id}>
+                    <Link to={`/kit/${k.id}`} className={`card kit ${CLS(k.status)}`}>
+                      <KitImg src={cardImage(k)} alt="" className="thumb" />
+                      <div className="grow">
+                        <strong>{kitTitle(k)}</strong>
+                        <small>{[k.series, k.grades?.scale].filter(Boolean).join(' • ')}</small>
+                        <div className="row">
+                          <Segments done={done} status={k.status} />
+                          <span className="pct">{k.progress}%</span>
+                        </div>
                       </div>
-                    </div>
-                    <Badge status={k.status} />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                      <Badge status={k.status} />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </State>
     </>
