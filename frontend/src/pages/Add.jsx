@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import kitService from '../services/kitService.js';
 import logService from '../services/logService.js';
 import uploadService from '../services/uploadService.js';
+import { enqueue } from '../outbox.js';
 import { kitTitle } from '../util.js';
 import { useGrades } from '../hooks/useGrades.js';
 import { useKits } from '../hooks/useKits.js';
@@ -48,12 +49,34 @@ function KitForm() {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setErr('');
+
+    const body = { ...f, image_url: f.image_url.trim(), grade_id: Number(f.grade_id) || '' };
+    const grade = grades?.find((g) => String(g.id) === String(f.grade_id));
+
+    // Simpan ke antrean offline; akan dikirim otomatis saat koneksi kembali
+    const queueIt = async () => {
+      await enqueue({
+        type: 'kit',
+        payload: body,
+        file,
+        meta: { grade_name: grade?.name, grade_scale: grade?.scale },
+      });
+      nav('/progres');
+    };
+
     try {
-      let image_url = f.image_url.trim();
+      if (!navigator.onLine) { await queueIt(); return; }
+      let image_url = body.image_url;
       if (file) image_url = (await uploadService.upload(file)).url;
-      await kitService.create({ ...f, image_url, grade_id: Number(f.grade_id) || '' });
+      await kitService.create({ ...body, image_url });
       nav('/');
-    } catch (e2) { setErr(e2.message); setBusy(false); }
+    } catch (e2) {
+      // Tanpa status = masalah jaringan (bukan ditolak server) -> masukkan ke antrean
+      if (!e2.status) {
+        try { await queueIt(); return; } catch { /* gagal menyimpan antrean: tampilkan error di bawah */ }
+      }
+      setErr(e2.message); setBusy(false);
+    }
   };
 
   return (
@@ -116,10 +139,25 @@ function LogForm() {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setErr('');
-    try {
-      await logService.create({ ...f, kit_id: Number(f.kit_id) || '' });
+
+    const body = { ...f, kit_id: Number(f.kit_id) || '' };
+    const kit = kits?.find((k) => String(k.id) === String(f.kit_id));
+
+    const queueIt = async () => {
+      await enqueue({ type: 'log', payload: body, meta: { kit_name: kit ? kitTitle(kit) : '' } });
       nav('/log');
-    } catch (e2) { setErr(e2.message); setBusy(false); }
+    };
+
+    try {
+      if (!navigator.onLine) { await queueIt(); return; }
+      await logService.create(body);
+      nav('/log');
+    } catch (e2) {
+      if (!e2.status) {
+        try { await queueIt(); return; } catch { /* tampilkan error di bawah */ }
+      }
+      setErr(e2.message); setBusy(false);
+    }
   };
 
   return (
