@@ -16,12 +16,12 @@ export default function Progress() {
   const { items, tick, syncNow, retry, discard } = useOutbox();
   const [filter, setFilter] = useState('all');
 
-  // Setiap ada kit antrean yang berhasil terkirim, muat ulang daftar dari server
-  useEffect(() => { if (tick > 0) refetch(); }, [tick, refetch]);
+  useEffect(() => { refetch(); }, [tick, items.length, refetch]);
 
-  const queued = items.filter((q) => q.type === 'kit');
-  // Kit baru selalu berstatus Backlog, jadi antrean tampil di filter Semua dan Backlog
-  const showQueue = queued.length > 0 && (filter === 'all' || filter === 'Backlog');
+  const queued = items.filter((q) => q.type === 'kit' || q.type === 'progress');
+  const showQueue =
+    queued.length > 0 &&
+    (filter === 'all' || filter === 'Backlog' || queued.some((q) => q.type === 'progress'));
   const shown = (kits || []).filter((k) => filter === 'all' || k.status === filter);
 
   return (
@@ -70,7 +70,7 @@ export default function Progress() {
                           <span className="pct">{k.progress}%</span>
                         </div>
                       </div>
-                      <Badge status={k.status} />
+                      <Badge status={k.status} syncStatus={k._syncStatus} />
                     </Link>
                   </li>
                 );
