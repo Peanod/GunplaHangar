@@ -16,18 +16,23 @@ function useFileUrl(file) {
   return url;
 }
 
-// Satu item antrean: kit baru atau catatan baru yang belum terkirim ke server
 export default function QueueCard({ item, onRetry, onDiscard }) {
   const { type, payload, meta = {}, status, error } = item;
   const isKit = type === 'kit';
+  const isProgress = type === 'progress';
   const preview = useFileUrl(item.file) || payload.image_url;
 
   const title = isKit
     ? kitTitle({ name: payload.name, grades: meta.grade_name ? { name: meta.grade_name } : null })
-    : payload.title;
+    : isProgress
+      ? `Update progres: ${meta.kit_name || 'Kit'}`
+      : payload.title;
+
   const sub = isKit
     ? [payload.series, meta.grade_scale].filter(Boolean).join(' • ')
-    : `${meta.kit_name || 'Kit'}${payload.work_date ? ` • ${fmtDate(payload.work_date)}` : ''}`;
+    : isProgress
+      ? `Progres baru: ${meta.progress ?? 0}% (${meta.status || 'Backlog'})`
+      : `${meta.kit_name || 'Kit'}${payload.work_date ? ` • ${fmtDate(payload.work_date)}` : ''}`;
 
   const note =
     status === 'uploading' ? 'Mengirim ke server…'
