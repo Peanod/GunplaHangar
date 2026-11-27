@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import kitService from '../services/kitService.js';
 import uploadService from '../services/uploadService.js';
+import { enqueue, useOutbox } from '../outbox.js';
+import QueueCard from '../components/QueueCard.jsx';
 import { useKitById } from '../hooks/useKits.js';
 import { Badge, FitImg, KitImg, Segments, State } from '../components/Bits.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
@@ -12,27 +14,76 @@ export default function KitDetail() {
   const nav = useNavigate();
   const location = useLocation();
   const goBack = () => (location.key !== 'default' ? nav(-1) : nav('/progres'));
-  const { data: kit, loading, error, setData } = useKitById(id);
+  const { data: kit, loading, error, setData, refetch } = useKitById(id);
+  const { items, tick, retry, discard } = useOutbox();
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState('');
   const [confirming, setConfirming] = useState(false);
 
+  // Refresh data kit otomatis setelah antrean progres berhasil terkirim saat online
+  useEffect(() => {
+    if (tick > 0) refetch();
+  }, [tick, refetch]);
+
+  const pendingProgressItems = items.filter(
+    (q) => q.type === 'progress' && String(q.meta?.kit_id) === String(id)
+  );
+
   const toggle = (k) => { setData((cur) => ({ ...cur, [k]: !cur[k] })); setDirty(true); setMsg(''); };
 
   const save = async () => {
     setBusy(true);
+    setMsg('');
+    const body = {};
+    PARTS.forEach(([k]) => { body[k] = !!kit[k]; });
+    const dNext = derive(body);
+
+    const queueProgress = async () => {
+      await enqueue({
+        type: 'progress',
+        payload: body,
+        meta: {
+          kit_id: id,
+          kit_name: kitTitle(kit),
+          progress: dNext.progress,
+          status: dNext.status,
+        },
+      });
+      setData((cur) => ({
+        ...cur,
+        ...body,
+        progress: dNext.progress,
+        status: dNext.status,
+        _syncStatus: 'pending',
+      }));
+      setDirty(false);
+      setMsg('Offline: perubahan progres disimpan lokal (Pending) dan akan dikirim otomatis saat online.');
+    };
+
     try {
-      const body = {};
-      PARTS.forEach(([k]) => { body[k] = kit[k]; });
+      if (!navigator.onLine) {
+        await queueProgress();
+        setBusy(false);
+        return;
+      }
       const upd = await kitService.update(id, body);
       setData(upd);
       setDirty(false);
       setMsg(upd.status === 'Completed' && !upd.progress_photos?.final
         ? 'Progres tersimpan. Kit rampung, saatnya foto hasil akhir.'
         : 'Progres tersimpan.');
-    } catch (e) { setMsg(e.message); }
+    } catch (e) {
+      if (!e.status) {
+        try {
+          await queueProgress();
+          setBusy(false);
+          return;
+        } catch { /* tampilkan error di bawah */ }
+      }
+      setMsg(e.message);
+    }
     setBusy(false);
   };
 
@@ -127,10 +178,18 @@ export default function KitDetail() {
             <div className="progress-box">
               <div className="row between">
                 <span>Progres rakit: <b>{d.progress}%</b> ({d.done}/{d.total} tahap utama)</span>
-                <Badge status={d.status} />
+                <Badge status={d.status} syncStatus={kit._syncStatus} />
               </div>
               <Segments done={d.done} total={d.total} status={d.status} />
             </div>
+
+            {pendingProgressItems.length > 0 && (
+              <ul className="list" style={{ marginTop: '12px' }}>
+                {pendingProgressItems.map((q) => (
+                  <QueueCard key={q.id} item={q} onRetry={retry} onDiscard={(qid) => { discard(qid); refetch(); }} />
+                ))}
+              </ul>
+            )}
             </div>
             <div>
 
