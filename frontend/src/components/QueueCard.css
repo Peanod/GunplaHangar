@@ -1,0 +1,24 @@
+/* Kartu antrean offline (Pending / Uploading / Gagal) */
+.card.qcard { border-left-color: var(--amber); }
+.card.qcard.uploading { border-left-color: var(--cyan); }
+.card.qcard.failed { border-left-color: var(--red); }
+
+.qcard .qnote { color: var(--muted); }
+.qcard.failed .qnote { color: var(--red); }
+.qcard .qactions { display: flex; gap: 14px; }
+
+.qcard .qb.pending { color: var(--amber); }
+.qcard .qb.uploading { color: var(--cyan); animation: qpulse 1.2s ease-in-out infinite; }
+.qcard .qb.failed { color: var(--red); }
+
+.qcard .qbar { position: relative; display: block; height: 4px; border-radius: 2px; background: var(--panel2); overflow: hidden; }
+.qcard .qbar::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 40%; background: var(--cyan); animation: qslide 1.1s linear infinite; }
+
+.qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.qhead h2 { margin-right: auto; }
+
+@keyframes qslide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes qpulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .qcard .qb.uploading, .qcard .qbar::after { animation: none; }
+}
