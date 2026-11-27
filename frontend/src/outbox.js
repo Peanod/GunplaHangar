@@ -1,19 +1,23 @@
-// Antrean offline (outbox) untuk data yang dibuat saat tidak ada koneksi.
-// Disimpan di IndexedDB (bisa menyimpan File/foto, localStorage tidak bisa).
-// Status item: 'pending' -> 'uploading' -> (berhasil: dihapus dari antrean) atau 'failed'.
+// Antrean offline (outbox) untuk data yang dibuat/diubah saat tidak ada koneksi.
+// Mendukung: 'kit' (tambah kit), 'log' (tambah catatan), dan 'progress' (update checklist kit).
 import { useEffect, useState } from 'react';
 import kitService from './services/kitService.js';
 import logService from './services/logService.js';
 import uploadService from './services/uploadService.js';
+import { derive } from './util.js';
 
 const DB = 'gunplahangar-outbox';
 const STORE = 'queue';
 
-// ---------- IndexedDB kecil ----------
+// ---------- IndexedDB ----------
 const openDb = () =>
   new Promise((resolve, reject) => {
     const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE)) {
+        req.result.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
@@ -27,13 +31,38 @@ async function run(mode, action) {
     t.onerror = t.onabort = () => { db.close(); reject(t.error); };
   });
 }
-const dbAll = () => run('readonly', (s) => s.getAll());
-const dbPut = (item) => run('readwrite', (s) => s.put(item)).catch(() => {});
-const dbDel = (id) => run('readwrite', (s) => s.delete(id)).catch(() => {});
+
+async function serializeFile(file) {
+  if (!file) return null;
+  const buffer = await file.arrayBuffer();
+  return { name: file.name, type: file.type || 'image/jpeg', buffer };
+}
+
+function deserializeFile(raw) {
+  if (!raw) return null;
+  if (raw instanceof File || raw instanceof Blob) return raw;
+  if (raw.buffer) {
+    return new File([raw.buffer], raw.name || 'upload.jpg', { type: raw.type || 'image/jpeg' });
+  }
+  return null;
+}
+
+const dbAll = async () => {
+  const rows = (await run('readonly', (s) => s.getAll())) || [];
+  return rows.map((r) => ({ ...r, file: deserializeFile(r.fileData) }));
+};
+
+const dbPut = async (item) => {
+  const { file, ...rest } = item;
+  const fileData = item.fileData ?? (await serializeFile(file));
+  return run('readwrite', (s) => s.put({ ...rest, fileData }));
+};
+
+const dbDel = (id) => run('readwrite', (s) => s.delete(id));
 
 // ---------- state di memori ----------
 let items = [];
-let tick = 0;          // naik setiap ada item yang berhasil terkirim (untuk refresh daftar)
+let tick = 0;
 let running = false;
 const subs = new Set();
 const emit = () => subs.forEach((fn) => fn());
@@ -52,9 +81,31 @@ async function patch(id, changes) {
 
 // ---------- API antrean ----------
 export async function enqueue({ type, payload, file = null, meta = {} }) {
-  const item = { id: newId(), type, payload, file, meta, status: 'pending', error: '', createdAt: Date.now() };
-  items = [...items, item].sort(byTime);
+  // Jika sudah ada antrean 'progress' untuk kit_id yang sama dan masih 'pending', timpa saja agar tidak menumpuk
+  if (type === 'progress' && meta.kit_id != null) {
+    const existing = items.find(
+      (i) => i.type === 'progress' && String(i.meta?.kit_id) === String(meta.kit_id) && i.status === 'pending'
+    );
+    if (existing) {
+      await patch(existing.id, { payload, meta: { ...existing.meta, ...meta }, createdAt: Date.now() });
+      return items.find((i) => i.id === existing.id);
+    }
+  }
+
+  const fileData = await serializeFile(file);
+  const item = {
+    id: newId(),
+    type,
+    payload,
+    file,
+    fileData,
+    meta,
+    status: 'pending',
+    error: '',
+    createdAt: Date.now(),
+  };
   await dbPut(item);
+  items = [...items, item].sort(byTime);
   emit();
   return item;
 }
@@ -70,6 +121,27 @@ export async function retry(id) {
   sync();
 }
 
+// Terapkan perubahan progres lokal yang belum terkirim ke objek kit
+export async function applyPendingProgress(kit) {
+  if (!kit) return kit;
+  const rows = items.length ? items : await dbAll();
+  const pendingProg = rows
+    .filter((i) => i.type === 'progress' && String(i.meta?.kit_id) === String(kit.id))
+    .sort(byTime);
+
+  if (pendingProg.length === 0) return kit;
+
+  let merged = { ...kit };
+  for (const p of pendingProg) {
+    merged = { ...merged, ...p.payload };
+    const d = derive(merged);
+    merged.progress = d.progress;
+    merged.status = d.status;
+    merged._syncStatus = p.status; // 'pending' | 'uploading' | 'failed'
+  }
+  return merged;
+}
+
 // Kirim semua item 'pending' satu per satu
 export async function sync() {
   if (running || !navigator.onLine) return;
@@ -82,11 +154,12 @@ export async function sync() {
         if (it.type === 'kit') {
           let image_url = it.payload.image_url;
           if (it.file) {
-            // simpan URL hasil unggah supaya tidak mengunggah ulang kalau langkah berikutnya gagal
             image_url = it.uploadedUrl || (await uploadService.upload(it.file)).url;
             if (!it.uploadedUrl) await patch(it.id, { uploadedUrl: image_url });
           }
           await kitService.create({ ...it.payload, image_url });
+        } else if (it.type === 'progress') {
+          await kitService.update(it.meta.kit_id, it.payload);
         } else {
           await logService.create(it.payload);
         }
@@ -96,11 +169,9 @@ export async function sync() {
         emit();
       } catch (e) {
         if (!e.status) {
-          // masih tidak ada koneksi: kembalikan ke pending, coba lagi nanti
           await patch(it.id, { status: 'pending' });
           break;
         }
-        // ditolak server (mis. data tidak valid): tandai gagal
         await patch(it.id, { status: 'failed', error: e.message });
       }
     }
@@ -120,15 +191,17 @@ export function useOutbox() {
 if (typeof window !== 'undefined') {
   (async () => {
     try {
-      const saved = (await dbAll()) || [];
-      // item yang tertahan 'uploading' (tab tertutup saat mengirim) dikembalikan ke pending
-      items = saved.map((i) => (i.status === 'uploading' ? { ...i, status: 'pending' } : i)).sort(byTime);
+      const saved = await dbAll();
+      items = saved
+        .map((i) => (i.status === 'uploading' ? { ...i, status: 'pending' } : i))
+        .sort(byTime);
       emit();
-    } catch { /* IndexedDB tidak tersedia: antrean hanya di memori */ }
+    } catch (err) {
+      console.error('Gagal membaca outbox IndexedDB:', err);
+    }
     if (navigator.onLine) sync();
   })();
   window.addEventListener('online', () => sync());
-  // jaga-jaga kalau navigator.onLine "online" tapi server sempat tidak terjangkau
   setInterval(() => {
     if (navigator.onLine && items.some((i) => i.status === 'pending')) sync();
   }, 15000);
